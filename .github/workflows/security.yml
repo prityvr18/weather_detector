@@ -1,0 +1,49 @@
+name: Security and Fuzz Testing
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  security-scan:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Setup Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.11.2'  # Replace with your Python version
+
+      - name: Install Dependencies
+        run: |
+          pip install -r requirements.txt
+
+      - name: Run OWASP ZAP
+        run: |
+          docker run -t owasp/zap2docker-stable zap-baseline.py -t http://localhost:8000
+
+      - name: Run Safety
+        run: |
+          pip install safety
+          safety check -r requirements.txt
+
+      - name: Install CodeQL
+        run: |
+          choco install codeql-cli  # Using Chocolatey to install CodeQL CLI on Windows
+
+      - name: Run CodeQL
+        run: |
+          codeql database create codeql-db --language=python --source-root=.
+          codeql database analyze codeql-db python-security-and-quality.qls --format=sarif-latest --output=results.sarif
+
+      - name: Run Atheris Fuzzing (WSL or Docker)
+        run: |
+          pip install atheris
+          python fuzz_weather_data.py
